@@ -34,13 +34,19 @@ BIJNA_DEAL_MARGE = 25
 STATE_FILE = "/tmp/deals_gevonden.json"
 BIJNA_FILE = "/tmp/bijna_deals_gevonden.json"
 
-MAANDEN_VOORUIT  = 3          # 3 maanden vooruit (was 6)
-DAGEN_PER_MAAND  = [7, 21]   # 2 datums per maand (was 4) → 6 checks per bestemming
+MAANDEN_VOORUIT  = 3          # 3 maanden vooruit
+DAGEN_PER_MAAND  = [7, 21]   # 2 datums per maand → 6 checks per bestemming
 
 # ─── MCP ENDPOINTS ────────────────────────────────────────────────────────────
 
 SKIPLAGGED_MCP = "https://mcp.skiplagged.com/mcp"
 KIWI_MCP       = "https://mcp.kiwi.com"
+
+# ─── VERTREKPUNTEN ────────────────────────────────────────────────────────────
+# Alle luchthavens worden geprobeerd; goedkoopste combinatie wint.
+# AMS = Schiphol | RTM = Rotterdam (15 min) | EIN = Eindhoven Ryanair (90 min)
+
+VERTREK_LUCHTHAVENS = ["AMS", "RTM", "EIN"]
 
 # ─── BESTEMMINGEN ─────────────────────────────────────────────────────────────
 
@@ -55,10 +61,22 @@ BESTEMMINGEN = [
     {"naam": "Las Vegas",      "iata": "LAS", "max_prijs": 450, "min_nachten": 7,  "max_nachten": 21, "emoji": "🎰"},
     {"naam": "Buenos Aires",   "iata": "EZE", "max_prijs": 500, "min_nachten": 7,  "max_nachten": 28, "emoji": "💃"},
     {"naam": "Tokyo",          "iata": "NRT", "max_prijs": 500, "min_nachten": 7,  "max_nachten": 28, "emoji": "🗼"},
-    # ── Korte vluchten ──────────────────────────────────────────────────────
-    {"naam": "Londen",         "iata": "LHR", "max_prijs": 50,  "min_nachten": 1,  "max_nachten": 10, "emoji": "🇬🇧"},
+    # ── Korte vluchten: Londen ──────────────────────────────────────────────
+    {"naam": "Londen Heathrow","iata": "LHR", "max_prijs": 50,  "min_nachten": 1,  "max_nachten": 10, "emoji": "🇬🇧"},
     {"naam": "Londen Gatwick", "iata": "LGW", "max_prijs": 50,  "min_nachten": 1,  "max_nachten": 10, "emoji": "🎡"},
+    {"naam": "Londen Stansted","iata": "STN", "max_prijs": 40,  "min_nachten": 1,  "max_nachten": 10, "emoji": "✈️"},
+    # ── Korte vluchten: Frankrijk ────────────────────────────────────────────
+    {"naam": "Parijs",         "iata": "CDG", "max_prijs": 60,  "min_nachten": 2,  "max_nachten": 7,  "emoji": "🗼"},
+    {"naam": "Nice",           "iata": "NCE", "max_prijs": 80,  "min_nachten": 3,  "max_nachten": 10, "emoji": "🌊"},
+    {"naam": "Lyon",           "iata": "LYS", "max_prijs": 70,  "min_nachten": 2,  "max_nachten": 7,  "emoji": "🍷"},
+    {"naam": "Marseille",      "iata": "MRS", "max_prijs": 70,  "min_nachten": 3,  "max_nachten": 10, "emoji": "⛵"},
+    {"naam": "Bordeaux",       "iata": "BOD", "max_prijs": 70,  "min_nachten": 3,  "max_nachten": 7,  "emoji": "🍇"},
+    # ── Korte vluchten: België ───────────────────────────────────────────────
+    {"naam": "Brussel",        "iata": "BRU", "max_prijs": 50,  "min_nachten": 1,  "max_nachten": 5,  "emoji": "🇧🇪"},
+    # ── Overige populaire bestemmingen ───────────────────────────────────────
     {"naam": "Barcelona",      "iata": "BCN", "max_prijs": 70,  "min_nachten": 2,  "max_nachten": 14, "emoji": "🥘"},
+    {"naam": "Lissabon",       "iata": "LIS", "max_prijs": 80,  "min_nachten": 3,  "max_nachten": 10, "emoji": "🇵🇹"},
+    {"naam": "Rome",           "iata": "FCO", "max_prijs": 80,  "min_nachten": 3,  "max_nachten": 10, "emoji": "🏛️"},
 ]
 
 # ─── MCP CLIENT ───────────────────────────────────────────────────────────────
@@ -166,30 +184,30 @@ def gemiddeld_nachten(b: dict) -> int:
     return (b["min_nachten"] + b["max_nachten"]) // 2
 
 
-def zoek_skiplagged_kalender(iata: str, vertrek: str, nachten: int) -> float | None:
+def zoek_skiplagged_kalender(origin: str, iata: str, vertrek: str, nachten: int) -> float | None:
     terug = (datetime.strptime(vertrek, "%Y-%m-%d") + timedelta(days=nachten)).strftime("%Y-%m-%d")
     data = call_mcp(SKIPLAGGED_MCP, "sk_flex_departure_calendar", {
-        "origin": "AMS", "destination": iata,
+        "origin": origin, "destination": iata,
         "departureDate": vertrek, "returnDate": terug,
         "sort": "price", "renderMode": "text",
     })
     return extract_prijs_skiplagged(data)
 
 
-def zoek_skiplagged(iata: str, vertrek: str, terug: str) -> float | None:
+def zoek_skiplagged(origin: str, iata: str, vertrek: str, terug: str) -> float | None:
     data = call_mcp(SKIPLAGGED_MCP, "sk_flights_search", {
-        "origin": "AMS", "destination": iata,
+        "origin": origin, "destination": iata,
         "departureDate": vertrek, "returnDate": terug,
         "maxStops": "one", "sort": "price", "limit": 5, "renderMode": "text",
     })
     return extract_prijs_skiplagged(data)
 
 
-def zoek_kiwi(iata: str, vertrek: str, terug: str) -> float | None:
+def zoek_kiwi(origin: str, iata: str, vertrek: str, terug: str) -> float | None:
     def fmt(d: str) -> str:
         return datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m/%Y")
     data = call_mcp(KIWI_MCP, "search-flight", {
-        "flyFrom": "AMS", "flyTo": iata,
+        "flyFrom": origin, "flyTo": iata,
         "departureDate": fmt(vertrek), "returnDate": fmt(terug),
         "currency": "EUR",
     })
@@ -197,6 +215,10 @@ def zoek_kiwi(iata: str, vertrek: str, terug: str) -> float | None:
 
 
 def zoek_beste_prijs(bestemming: dict) -> tuple:
+    """
+    Zoekt goedkoopste retourvlucht over alle vertrekpunten × datums.
+    Geeft (prijs, vertrek_datum, terug_datum, bron_string) terug.
+    """
     iata    = bestemming["iata"]
     nachten = gemiddeld_nachten(bestemming)
     nu      = datetime.now()
@@ -215,21 +237,23 @@ def zoek_beste_prijs(bestemming: dict) -> tuple:
             vertrek = check.strftime("%Y-%m-%d")
             terug   = (check + timedelta(days=nachten)).strftime("%Y-%m-%d")
 
-            prijs = zoek_skiplagged_kalender(iata, vertrek, nachten)
-            bron  = "Skiplagged kalender"
+            # Probeer elk vertrekpunt; goedkoopste combinatie wint
+            for origin in VERTREK_LUCHTHAVENS:
+                prijs = zoek_skiplagged_kalender(origin, iata, vertrek, nachten)
+                bron  = f"Skiplagged kalender ({origin})"
 
-            if prijs is None:
-                prijs = zoek_skiplagged(iata, vertrek, terug)
-                bron  = "Skiplagged"
+                if prijs is None:
+                    prijs = zoek_skiplagged(origin, iata, vertrek, terug)
+                    bron  = f"Skiplagged ({origin})"
 
-            if prijs is None:
-                prijs = zoek_kiwi(iata, vertrek, terug)
-                bron  = "Kiwi"
+                if prijs is None:
+                    prijs = zoek_kiwi(origin, iata, vertrek, terug)
+                    bron  = f"Kiwi ({origin})"
 
-            if prijs and (beste_prijs is None or prijs < beste_prijs):
-                beste_prijs, beste_vertrek, beste_terug, beste_bron = prijs, vertrek, terug, bron
+                if prijs and (beste_prijs is None or prijs < beste_prijs):
+                    beste_prijs, beste_vertrek, beste_terug, beste_bron = prijs, vertrek, terug, bron
 
-            time.sleep(0.8)
+                time.sleep(0.5)
 
     return beste_prijs, beste_vertrek, beste_terug, beste_bron
 
@@ -247,17 +271,30 @@ def fmt_datum(d: str) -> str:
         return d
 
 
-def skyscanner_link(iata, vertrek, terug):
-    v, t = vertrek.replace("-", ""), terug.replace("-", "")
-    return f"https://www.skyscanner.nl/transport/vluchten/ams/{iata.lower()}/{v}/{t}/?adults=1&cabinclass=economy"
+def _origin_uit_bron(bron: str) -> str:
+    """Haal vertrekpunt (AMS/RTM/EIN) uit bron-string zoals 'Kiwi (RTM)'."""
+    for o in VERTREK_LUCHTHAVENS:
+        if f"({o})" in bron:
+            return o
+    return "AMS"
 
 
-def google_flights_link(iata, vertrek, terug):
-    return f"https://www.google.com/travel/flights/search?q=vluchten+Amsterdam+{iata}+{vertrek}+retour+{terug}&hl=nl&gl=NL"
+def skyscanner_link(iata, vertrek, terug, bron=""):
+    v, t   = vertrek.replace("-", ""), terug.replace("-", "")
+    origin = _origin_uit_bron(bron).lower()
+    return f"https://www.skyscanner.nl/transport/vluchten/{origin}/{iata.lower()}/{v}/{t}/?adults=1&cabinclass=economy"
 
 
-def kiwi_link(iata, vertrek, terug):
-    return f"https://www.kiwi.com/nl/search/results/amsterdam/airport-ams/{iata}/{vertrek}/{terug}/2?adults=1&currency=EUR"
+def google_flights_link(iata, vertrek, terug, bron=""):
+    origin = _origin_uit_bron(bron)
+    return f"https://www.google.com/travel/flights/search?q=vluchten+{origin}+{iata}+{vertrek}+retour+{terug}&hl=nl&gl=NL"
+
+
+def kiwi_link(iata, vertrek, terug, bron=""):
+    origin = _origin_uit_bron(bron).lower()
+    namen  = {"ams": "amsterdam/airport-ams", "rtm": "rotterdam/airport-rtm", "ein": "eindhoven/airport-ein"}
+    loc    = namen.get(origin, f"amsterdam/airport-{origin}")
+    return f"https://www.kiwi.com/nl/search/results/{loc}/{iata}/{vertrek}/{terug}/2?adults=1&currency=EUR"
 
 
 def send_telegram(msg: str):
@@ -290,9 +327,10 @@ def format_bericht(prijs, vertrek, terug, bron, bestemming, is_bijna):
     emoji   = bestemming["emoji"]
     iata    = bestemming["iata"]
     nachten = (datetime.strptime(terug, "%Y-%m-%d") - datetime.strptime(vertrek, "%Y-%m-%d")).days
-    sky = skyscanner_link(iata, vertrek, terug)
-    gfl = google_flights_link(iata, vertrek, terug)
-    kwi = kiwi_link(iata, vertrek, terug)
+    origin = _origin_uit_bron(bron)
+    sky = skyscanner_link(iata, vertrek, terug, bron)
+    gfl = google_flights_link(iata, vertrek, terug, bron)
+    kwi = kiwi_link(iata, vertrek, terug, bron)
     if is_bijna:
         diff   = round(prijs) - bestemming["max_prijs"]
         header = (f"⚠️ <b>BIJNA DEAL — {emoji} {naam}</b>\n"
@@ -302,8 +340,8 @@ def format_bericht(prijs, vertrek, terug, bron, bestemming, is_bijna):
     return (
         f"{header}\n\n"
         f"💶 <b>€{round(prijs)} p.p. retour</b>\n\n"
-        f"✈️  <b>Vertrek AMS</b>    📅 {fmt_datum(vertrek)}\n"
-        f"🔄 <b>Terug naar AMS</b>  📅 {fmt_datum(terug)}\n"
+        f"✈️  <b>Vertrek {origin}</b>    📅 {fmt_datum(vertrek)}\n"
+        f"🔄 <b>Terug naar {origin}</b>  📅 {fmt_datum(terug)}\n"
         f"🏝️  <b>Verblijf:</b> {nachten} nachten\n"
         f"📡 <b>Bron:</b> {bron}\n\n"
         f'🔍 <a href="{sky}">👉 Skyscanner</a>  '
