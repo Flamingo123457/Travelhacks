@@ -34,8 +34,8 @@ BIJNA_DEAL_MARGE = 25
 STATE_FILE = "/tmp/deals_gevonden.json"
 BIJNA_FILE = "/tmp/bijna_deals_gevonden.json"
 
-MAANDEN_VOORUIT  = 6
-DAGEN_PER_MAAND  = [1, 8, 15, 22]
+MAANDEN_VOORUIT  = 3          # 3 maanden vooruit (was 6)
+DAGEN_PER_MAAND  = [7, 21]   # 2 datums per maand (was 4) → 6 checks per bestemming
 
 # ─── MCP ENDPOINTS ────────────────────────────────────────────────────────────
 
