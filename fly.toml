@@ -1,15 +1,16 @@
-# Fly.io configuratie voor de Vluchtdeal Monitor
-# Geen HTTP-poort nodig — dit is een pure worker (loop script)
+# fly.toml app configuration file generated for vluchtdeal-monitor-mellow-overbrook-3777 on 2026-07-02T17:40:47+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "vluchtdeal-monitor"
-primary_region = "ams"   # Amsterdam datacenter
+app = 'vluchtdeal-monitor-mellow-overbrook-3777'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "Dockerfile"
-
-[env]
-  # Telegram secrets worden via 'fly secrets set' gezet, NIET hier
+  dockerfile = 'Dockerfile'
 
 [[vm]]
-  size = "shared-cpu-1x"   # Kleinste VM, gratis tier
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256
