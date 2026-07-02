@@ -25,8 +25,8 @@ import requests
 
 # ─── CONFIGURATIE ─────────────────────────────────────────────────────────────
 
-TELEGRAM_TOKEN   = "JOUW_BOT_TOKEN_HIER"    # via @BotFather
-TELEGRAM_CHAT_ID = "JOUW_CHAT_ID_HIER"      # via @userinfobot
+TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN",   "JOUW_BOT_TOKEN_HIER")   # via @BotFather of fly secrets
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "JOUW_CHAT_ID_HIER")      # via @userinfobot of fly secrets
 
 BIJNA_DEAL_MARGE = 25    # €25 boven limiet = bijna-deal melding
 CHECK_INTERVAL   = 600   # seconden tussen rondes (10 minuten)

@@ -1,0 +1,15 @@
+# Fly.io configuratie voor de Vluchtdeal Monitor
+# Geen HTTP-poort nodig — dit is een pure worker (loop script)
+
+app = "vluchtdeal-monitor"
+primary_region = "ams"   # Amsterdam datacenter
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Telegram secrets worden via 'fly secrets set' gezet, NIET hier
+
+[[vm]]
+  size = "shared-cpu-1x"   # Kleinste VM, gratis tier
+  memory = "256mb"
