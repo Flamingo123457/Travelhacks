@@ -148,22 +148,23 @@ def _parse_sse(text: str) -> dict | None:
 USD_NAAR_EUR = 0.92
 
 
+SKIPLAGGED_ERROR_MARKERS = ("failed to fetch", "request failed", "429", "503", "error", "unavailable")
+MIN_PRIJS_EUR = 25
+
+
 def _parse_skiplagged_tekst(text: str) -> float | None:
     """
     Parse Skiplagged markdown-tekst en geef goedkoopste prijs (omgezet naar EUR).
     Skiplagged geeft: '- Price: $186 | ...' of '- Departure: ... | Price: $204'
+    Gooit foutmeldingen weg (429-rate-limit, 503, etc.) zodat statuscodes
+    niet als prijzen worden geïnterpreteerd.
     """
-    # Zoek alle 'Price: $NNN' patronen
+    if any(m in text.lower() for m in SKIPLAGGED_ERROR_MARKERS):
+        return None
     matches = re.findall(r"Price:\s*\$(\d+(?:\.\d+)?)", text)
-    if not matches:
-        # Fallback: zoek losse getallen ≥ 50 (om rommel te vermijden)
-        matches = re.findall(r"\b(\d{2,5})\b", text)
     if matches:
-        try:
-            laagste_usd = min(float(m) for m in matches)
-            return round(laagste_usd * USD_NAAR_EUR, 2)
-        except ValueError:
-            return None
+        prijs = round(min(float(m) for m in matches) * USD_NAAR_EUR, 2)
+        return prijs if prijs >= MIN_PRIJS_EUR else None
     return None
 
 
@@ -335,13 +336,22 @@ def send_telegram(msg: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
         r = requests.post(url, json={
-            "chat_id":                  TELEGRAM_CHAT_ID,
-            "text":                     msg,
-            "parse_mode":               "HTML",
-            "disable_web_page_preview": False,
+            "chat_id": TELEGRAM_CHAT_ID, "text": msg,
+            "parse_mode": "HTML", "disable_web_page_preview": False,
         }, timeout=10)
-        r.raise_for_status()
-        print(f"[{nu()}] ✅ Telegram verstuurd")
+        if not r.ok:
+            print(f"[{nu()}] ❌ Telegram fout {r.status_code}: {r.text}")
+            # Probeer opnieuw zonder HTML-opmaak
+            r2 = requests.post(url, json={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": re.sub(r"<[^>]+>", "", msg),
+            }, timeout=10)
+            if r2.ok:
+                print(f"[{nu()}] ✅ Telegram verstuurd (zonder opmaak)")
+            else:
+                print(f"[{nu()}] ❌ Telegram ook zonder opmaak mislukt: {r2.text}")
+        else:
+            print(f"[{nu()}] ✅ Telegram verstuurd")
     except Exception as e:
         print(f"[{nu()}] ❌ Telegram fout: {e}")
 
