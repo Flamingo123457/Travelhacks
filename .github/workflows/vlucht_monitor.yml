@@ -8,7 +8,7 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10        # stoppen als het te lang duurt
+    timeout-minutes: 20        # 12 bestemmingen × ~1 min = ~12 min; 20 geeft marge
 
     steps:
       - name: Checkout repo
