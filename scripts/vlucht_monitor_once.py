@@ -110,12 +110,19 @@ def _extract_mcp_content(data: dict) -> dict | None:
     return None
 
 
+SKIPLAGGED_ERROR_MARKERS = ("failed to fetch", "request failed", "429", "503", "error", "unavailable")
+MIN_PRIJS_EUR = 25  # Elk bedrag lager dan dit is een parse-fout, geen echte vlucht
+
+
 def _parse_skiplagged_tekst(text: str) -> float | None:
+    # Gooi response weg als het een foutmelding is (429, 503, etc.)
+    if any(m in text.lower() for m in SKIPLAGGED_ERROR_MARKERS):
+        return None
+    # Zoek expliciet 'Price: $NNN' patronen (meest betrouwbaar)
     matches = re.findall(r"Price:\s*\$(\d+(?:\.\d+)?)", text)
-    if not matches:
-        matches = re.findall(r"\b(\d{2,5})\b", text)
     if matches:
-        return round(min(float(m) for m in matches) * USD_NAAR_EUR, 2)
+        prijs = round(min(float(m) for m in matches) * USD_NAAR_EUR, 2)
+        return prijs if prijs >= MIN_PRIJS_EUR else None
     return None
 
 
@@ -260,8 +267,20 @@ def send_telegram(msg: str):
             "chat_id": TELEGRAM_CHAT_ID, "text": msg,
             "parse_mode": "HTML", "disable_web_page_preview": False,
         }, timeout=10)
-        r.raise_for_status()
-        print(f"[{nu()}] ✅ Telegram verstuurd")
+        if not r.ok:
+            # Log volledige foutmelding van Telegram zodat we kunnen debuggen
+            print(f"[{nu()}] ❌ Telegram fout {r.status_code}: {r.text}")
+            # Probeer opnieuw zonder HTML-opmaak (HTML-tags kunnen 400 veroorzaken)
+            r2 = requests.post(url, json={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": re.sub(r"<[^>]+>", "", msg),  # strip HTML tags
+            }, timeout=10)
+            if r2.ok:
+                print(f"[{nu()}] ✅ Telegram verstuurd (zonder opmaak)")
+            else:
+                print(f"[{nu()}] ❌ Telegram ook zonder opmaak mislukt: {r2.text}")
+        else:
+            print(f"[{nu()}] ✅ Telegram verstuurd")
     except Exception as e:
         print(f"[{nu()}] ❌ Telegram fout: {e}")
 

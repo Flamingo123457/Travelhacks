@@ -2,7 +2,7 @@ name: ✈️ Vluchtdeal Monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # elke 15 minuten (GitHub minimum = 5 min, maar 15 is veiliger)
+    - cron: '*/8 * * * *'    # elke 8 minuten (publieke repo = onbeperkt gratis)
   workflow_dispatch:           # ook handmatig starten via GitHub UI
 
 jobs:
